@@ -89,18 +89,20 @@ def indent_html(rawcode: str, config: Config) -> str:
 
     for item in rawcode_flat_list:
         # if a raw tag first line
-        if not is_block_raw and is_ignored_block_opening(config, item):
+        is_ignored_block_opening_ = is_ignored_block_opening(config, item)
+        is_safe_closing_tag_ = is_safe_closing_tag(config, item)
+        if not is_block_raw and is_ignored_block_opening_:
             is_raw_first_line = True
 
         # if a raw tag then start ignoring
-        if is_ignored_block_opening(config, item):
+        if is_ignored_block_opening_:
             is_block_raw = True
             ignored_level += 1
 
         if is_script_style_block_opening(config, item):
             in_script_style_tag = True
 
-        if is_safe_closing_tag(config, item):
+        if is_safe_closing_tag_:
             ignored_level -= 1
             ignored_level = max(ignored_level, 0)
             if is_block_raw and ignored_level == 0:
@@ -183,7 +185,7 @@ def indent_html(rawcode: str, config: Config) -> str:
                 flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE,
             )
             and not is_block_raw
-            and not is_safe_closing_tag(config, item)
+            and not is_safe_closing_tag_
             # and not ending in a slt like <span><strong></strong>.
             and not re.findall(
                 rf"(<({slt_html})>)(.*?)(</(\2)>[^<]*?$)",
@@ -262,7 +264,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             indent_level += 1
 
         elif is_raw_first_line or (
-            is_safe_closing_tag(config, item) and not is_block_raw
+            is_safe_closing_tag_ and not is_block_raw
         ):
             tmp = (indent * indent_level) + item + "\n"
 
@@ -302,7 +304,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             or is_script_style_block_closing(config, item)
         ):
             in_script_style_tag = False
-            if not is_safe_closing_tag(config, item):
+            if not is_safe_closing_tag_:
                 ignored_level -= 1
                 ignored_level = max(ignored_level, 0)
             if ignored_level == 0:
