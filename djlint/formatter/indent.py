@@ -9,6 +9,10 @@ import json5 as json
 import regex as re
 
 from ..helpers import (
+    RE_FLAGS_IMV,
+    RE_FLAGS_IMVD,
+    RE_FLAGS_IVM,
+    RE_FLAGS_VI,
     inside_ignored_block,
     is_ignored_block_closing,
     is_ignored_block_opening,
@@ -112,7 +116,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             re.findall(
                 rf"^\s*?(?:{config.ignored_inline_blocks})",
                 item,
-                flags=re.IGNORECASE | re.VERBOSE | re.MULTILINE,
+                flags=RE_FLAGS_IVM,
             )
             and not is_block_raw
         ) or (
@@ -141,7 +145,7 @@ def indent_html(rawcode: str, config: Config) -> str:
                     [^<]*?$ # with no other tags following until end of line
                 """,
                     item,
-                    flags=re.IGNORECASE | re.VERBOSE | re.MULTILINE,
+                    flags=RE_FLAGS_IVM,
                 )
             )
             and not is_block_raw
@@ -154,7 +158,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             and re.search(
                 r"^(?!.*\{\%).*%\}.*$",
                 item,
-                flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE,
+                flags=RE_FLAGS_IMV,
             )
             and not is_block_raw
             and in_set_tag
@@ -169,7 +173,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             and re.search(
                 r"^[ ]*}|^[ ]*]",
                 item,
-                flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE,
+                flags=RE_FLAGS_IMV,
             )
             and not is_block_raw
             and in_set_tag
@@ -182,7 +186,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             re.search(
                 config.tag_unindent,
                 item,
-                flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE,
+                flags=RE_FLAGS_IMV,
             )
             and not is_block_raw
             and not is_safe_closing_tag_
@@ -190,23 +194,23 @@ def indent_html(rawcode: str, config: Config) -> str:
             and not re.findall(
                 rf"(<({slt_html})>)(.*?)(</(\2)>[^<]*?$)",
                 item,
-                flags=re.IGNORECASE | re.VERBOSE | re.MULTILINE,
+                flags=RE_FLAGS_IVM,
             )
             and not re.findall(
                 rf"(<({slt_html})\\b[^>]+?>)(.*?)(</(\2)>[^<]*?$)",
                 item,
-                flags=re.IGNORECASE | re.VERBOSE | re.MULTILINE,
+                flags=RE_FLAGS_IVM,
             )
         ):
             # block to catch inline block followed by a non-break tag
             if re.findall(
                 rf"(^<({slt_html})>)(.*?)(</(\2)>)",
                 item,
-                flags=re.IGNORECASE | re.VERBOSE | re.MULTILINE,
+                flags=RE_FLAGS_IVM,
             ) or re.findall(
                 rf"(^<({slt_html})\b[^>]+?>)(.*?)(</(\2)>)",
                 item,
-                flags=re.IGNORECASE | re.VERBOSE | re.MULTILINE,
+                flags=RE_FLAGS_IVM,
             ):
                 # unindent after instead of before
                 tmp = (indent * indent_level) + item + "\n"
@@ -219,7 +223,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             re.search(
                 r"^" + str(config.tag_unindent_line),
                 item,
-                flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE,
+                flags=RE_FLAGS_IMV,
             )
             and not is_block_raw
         ):
@@ -233,7 +237,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             and re.search(
                 r"^([ ]*{%[ ]*?set)(?!.*%}).*$",
                 item,
-                flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE,
+                flags=RE_FLAGS_IMV,
             )
             and not is_block_raw
             and not in_set_tag
@@ -248,7 +252,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             and re.search(
                 r"(\{(?![^{}]*%[}\s])(?=[^{}]*$)|\[(?=[^\]]*$))",
                 item,
-                flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE,
+                flags=RE_FLAGS_IMV,
             )
             and not is_block_raw
             and in_set_tag
@@ -256,7 +260,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             re.search(
                 r"^(?:" + str(config.tag_indent) + r")",
                 item,
-                flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE,
+                flags=RE_FLAGS_IMV,
             )
             and not is_block_raw
         ):
@@ -295,7 +299,7 @@ def indent_html(rawcode: str, config: Config) -> str:
                 rf"(\s*?)(<(?:{config.indent_html_tags}))\s((?:\"[^\"]*\"|'[^']*'|{{[^}}]*}}|[^'\">{{}}\/])+?)(\s?/?>)",
                 func,
                 tmp,
-                flags=re.VERBOSE | re.IGNORECASE,
+                flags=RE_FLAGS_VI,
             )
 
         # turn off raw block if we hit end - for one line raw blocks, but not an inline raw
@@ -453,7 +457,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             r"([ ]*)({%-?)[ ]*(set)[ ]+?((?:(?!%}).)*?)(-?%})",
             func,
             beautified_code,
-            flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE | re.DOTALL,
+            flags=RE_FLAGS_IMVD,
         )
 
     if not config.no_function_formatting:
@@ -463,7 +467,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             r"([ ]*)({{-?\+?)[ ]*?((?:(?!}}).)*?\w)(\((?:\"[^\"]*\"|'[^']*'|[^\)])*?\)[ ]*)((?:\[[^\]]*?\]|\.[^\s]+)[ ]*)?((?:(?!}}).)*?-?\+?}})",
             func,
             beautified_code,
-            flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE | re.DOTALL,
+            flags=RE_FLAGS_IMVD,
         )
 
     if not config.preserve_blank_lines:
