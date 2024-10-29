@@ -113,12 +113,12 @@ def indent_html(rawcode: str, config: Config) -> str:
                 is_block_raw = False
 
         if (
-            re.search(
+            (not is_block_raw)
+            and re.search(
                 rf"^\s*?(?:{config.ignored_inline_blocks})",
                 item,
                 flags=RE_FLAGS_IVM,
             )
-            and not is_block_raw
         ) or (
             (not is_block_raw)
             and
