@@ -113,15 +113,17 @@ def indent_html(rawcode: str, config: Config) -> str:
                 is_block_raw = False
 
         if (
-            re.findall(
+            re.search(
                 rf"^\s*?(?:{config.ignored_inline_blocks})",
                 item,
                 flags=RE_FLAGS_IVM,
             )
             and not is_block_raw
         ) or (
+            (not is_block_raw)
+            and
             (
-                re.findall(
+                re.search(
                     rf"""^(?:[^<\s].*?)? # start of a line, optionally with some text
                     (?:
                         (?:<({slt_html})>)(?:.*?)(?:</(?:\1)>) # <span>stuff</span> >>>> match 1
@@ -148,20 +150,19 @@ def indent_html(rawcode: str, config: Config) -> str:
                     flags=RE_FLAGS_IVM,
                 )
             )
-            and not is_block_raw
         ):
             tmp = (indent * indent_level) + item + "\n"
 
         # closing set tag
         elif (
             not config.no_set_formatting
+            and not is_block_raw
+            and in_set_tag
             and re.search(
                 r"^(?!.*\{\%).*%\}.*$",
                 item,
                 flags=RE_FLAGS_IMV,
             )
-            and not is_block_raw
-            and in_set_tag
         ):
             indent_level = max(indent_level - 1, 0)
             in_set_tag = False
@@ -170,44 +171,44 @@ def indent_html(rawcode: str, config: Config) -> str:
         # closing curly brace inside a set tag
         elif (
             not config.no_set_formatting
+            and not is_block_raw
+            and in_set_tag
             and re.search(
                 r"^[ ]*}|^[ ]*]",
                 item,
                 flags=RE_FLAGS_IMV,
             )
-            and not is_block_raw
-            and in_set_tag
         ):
             indent_level = max(indent_level - 1, 0)
             tmp = (indent * indent_level) + item + "\n"
 
         # if unindent, move left
         elif (
-            re.search(
+            (not is_block_raw)
+            and not is_safe_closing_tag_
+            and re.search(
                 config.tag_unindent,
                 item,
                 flags=RE_FLAGS_IMV,
             )
-            and not is_block_raw
-            and not is_safe_closing_tag_
             # and not ending in a slt like <span><strong></strong>.
-            and not re.findall(
+            and not re.search(
                 rf"(<({slt_html})>)(.*?)(</(\2)>[^<]*?$)",
                 item,
                 flags=RE_FLAGS_IVM,
             )
-            and not re.findall(
+            and not re.search(
                 rf"(<({slt_html})\\b[^>]+?>)(.*?)(</(\2)>[^<]*?$)",
                 item,
                 flags=RE_FLAGS_IVM,
             )
         ):
             # block to catch inline block followed by a non-break tag
-            if re.findall(
+            if re.search(
                 rf"(^<({slt_html})>)(.*?)(</(\2)>)",
                 item,
                 flags=RE_FLAGS_IVM,
-            ) or re.findall(
+            ) or re.search(
                 rf"(^<({slt_html})\b[^>]+?>)(.*?)(</(\2)>)",
                 item,
                 flags=RE_FLAGS_IVM,
@@ -220,12 +221,12 @@ def indent_html(rawcode: str, config: Config) -> str:
                 tmp = (indent * indent_level) + item + "\n"
 
         elif (
-            re.search(
+            not is_block_raw
+            and re.search(
                 r"^" + str(config.tag_unindent_line),
                 item,
                 flags=RE_FLAGS_IMV,
             )
-            and not is_block_raw
         ):
             tmp = (indent * (indent_level - 1)) + item + "\n"
 
@@ -234,13 +235,13 @@ def indent_html(rawcode: str, config: Config) -> str:
         # opening set tag
         elif (
             not config.no_set_formatting
+            and not is_block_raw
+            and not in_set_tag
             and re.search(
                 r"^([ ]*{%[ ]*?set)(?!.*%}).*$",
                 item,
                 flags=RE_FLAGS_IMV,
             )
-            and not is_block_raw
-            and not in_set_tag
         ):
             tmp = (indent * indent_level) + item + "\n"
             indent_level += 1
@@ -249,20 +250,20 @@ def indent_html(rawcode: str, config: Config) -> str:
         # opening curly brace inside a set tag
         elif (
             not config.no_set_formatting
+            and not is_block_raw
+            and in_set_tag
             and re.search(
                 r"(\{(?![^{}]*%[}\s])(?=[^{}]*$)|\[(?=[^\]]*$))",
                 item,
                 flags=RE_FLAGS_IMV,
             )
-            and not is_block_raw
-            and in_set_tag
         ) or (
-            re.search(
+            not is_block_raw
+            and re.search(
                 r"^(?:" + str(config.tag_indent) + r")",
                 item,
                 flags=RE_FLAGS_IMV,
             )
-            and not is_block_raw
         ):
             tmp = (indent * indent_level) + item + "\n"
             indent_level += 1

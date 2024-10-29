@@ -179,11 +179,11 @@ def condense_html(html: str, config: Config) -> str:
         """Check if there should be a blank line after."""
         if config.blank_line_after_tag:
             return not any(
-                re.findall(
+                re.search(
                     rf"((?:{{%\s*?{tag}[^}}]+?%}}\n?)+)",
                     html,
                     flags=re.IGNORECASE | re.MULTILINE | re.DOTALL,
-                )
+                ) is not None
                 for tag in (
                     x.strip() for x in config.blank_line_after_tag.split(",")
                 )
@@ -194,11 +194,11 @@ def condense_html(html: str, config: Config) -> str:
         """Check if there should be a blank line before."""
         if config.blank_line_before_tag:
             return not any(
-                re.findall(
+                re.search(
                     rf"((?:{{%\s*?{tag}[^}}]+?%}}\n?)+)",
                     html,
                     flags=re.IGNORECASE | re.MULTILINE | re.DOTALL,
-                )
+                ) is not None
                 for tag in (
                     x.strip() for x in config.blank_line_before_tag.split(",")
                 )
