@@ -9,6 +9,7 @@ from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import regex as re
 import yaml
 from click import echo
 from colorama import Fore
@@ -16,6 +17,8 @@ from HtmlTagNames import html_tag_names
 from HtmlVoidElements import html_void_elements
 from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPatternError
+
+from djlint.helpers import RE_FLAGS_IMSX, RE_FLAGS_IMX, RE_FLAGS_IX
 
 if sys.version_info >= (3, 11):
     try:
@@ -1068,4 +1071,142 @@ class Config:
                 )>$
               )
         """
+        )
+        self.compile_regex()
+
+    def compile_regex(self) -> None:
+        self.ignored_inline_blocks_IX = re.compile(
+            self.ignored_inline_blocks, RE_FLAGS_IX
+        )
+        self.ignored_trans_blocks_closing_IX = re.compile(
+            self.ignored_trans_blocks_closing, RE_FLAGS_IX
+        )
+        self.newline_pattern = re.compile("\n")
+        self.ignored_group_opening_IMSX = re.compile(
+            self.ignored_inline_blocks + r" | " + self.ignored_blocks,
+            RE_FLAGS_IMSX,
+        )
+        self.safe_closing_tag_IX = re.compile(
+            self.safe_closing_tag, RE_FLAGS_IX
+        )
+        self.script_style_inline_IMSX = re.compile(
+            self.script_style_inline, RE_FLAGS_IMSX
+        )
+        self.script_style_inline_IX = re.compile(
+            self.script_style_inline, RE_FLAGS_IX
+        )
+        self.ignored_block_closing_IX = re.compile(
+            self.ignored_block_closing, RE_FLAGS_IX
+        )
+        self.script_style_opening_IX = re.compile(
+            self.script_style_opening, RE_FLAGS_IX
+        )
+        self.ignored_block_opening_IX = re.compile(
+            self.ignored_block_opening, RE_FLAGS_IX
+        )
+        self.ignored_blocks_inline_IMSX = re.compile(
+            self.ignored_blocks_inline, RE_FLAGS_IMSX
+        )
+        self.html_tag_regex_IMX = re.compile(self.html_tag_regex, RE_FLAGS_IMX)
+        html_tags = self.break_html_tags
+        break_char = self.break_before
+        self.expand_break_before_IX = re.compile(
+            rf"{break_char}\K(</?(?:{html_tags})\b(\"[^\"]*\"|'[^']*'|{{[^}}]*}}|[^'\">{{}}])*>)",
+            RE_FLAGS_IX,
+        )
+        self.expand_break_after_IX = re.compile(
+            rf"(</?(?:{html_tags})\b(\"[^\"]*\"|'[^']*'|{{[^}}]*}}|[^'\">{{}}])*>)(?!\s*?\n)(?=[^\n])",
+            RE_FLAGS_IX,
+        )
+        self.expand_template_tags_before_IMX = re.compile(
+            break_char
+            + r"\K((?:{%|{{\#)[ ]*?(?:"
+            + self.break_template_tags
+            + ")[^}]+?[%}]})",
+            RE_FLAGS_IMX,
+        )
+        self.expand_template_tags_after_IMX = re.compile(
+            r"((?:{%|{{\#)[ ]*?(?:"
+            + self.break_template_tags
+            + ")[^}]+?[%}]})(?=[^\n])",
+            RE_FLAGS_IMX,
+        )
+        self.unformatted_blocks_IMSX = re.compile(
+            self.unformatted_blocks, RE_FLAGS_IMSX
+        )
+        self.template_blocks_IMSX = re.compile(
+            self.template_blocks, RE_FLAGS_IMSX
+        )
+        self.ignored_blocks_IMSX = re.compile(
+            self.ignored_blocks, RE_FLAGS_IMSX
+        )
+        self.indent_block_raw_IMX = re.compile(
+            rf"^\s*?(?:{self.ignored_inline_blocks})", RE_FLAGS_IMX
+        )
+        self.indent_leading_space_IX = re.compile(
+            rf"(\s*?)(<(?:{self.indent_html_tags}))\s((?:\"[^\"]*\"|'[^']*'|{{[^}}]*}}|[^'\">{{}}\/])+?)(\s?/?>)",
+            RE_FLAGS_IX,
+        )
+        slt_html = self.indent_html_tags
+        always_self_closing_html = self.always_self_closing_html_tags
+        slt_template = self.optional_single_line_template_tags
+        # TODO: How to call it?
+        self.indent_full_match_IMX = re.compile(
+            rf"""^(?:[^<\s].*?)? # start of a line, optionally with some text
+                    (?:
+                        (?:<({slt_html})>)(?:.*?)(?:</(?:\1)>) # <span>stuff</span> >>>> match 1
+                       |(?:<({slt_html})\b[^>]+?>)(?:.*?)(?:</(?:\2)>) # <span stuff>stuff</span> >>> match 2
+                       |(?:<(?:{always_self_closing_html})\b[^>]*?/?>) # <img stuff />
+                       |(?:<(?:{slt_html})\b[^>]*?/>) # <img />
+                       |(?:{{%[ ]*?({slt_template})[ ]+?.*?%}})(?:.*?)(?:{{%[ ]+?end(?:\3)[ ]+?.*?%}}) # >>> match 3
+                       |{self.ignored_inline_blocks}
+                    )[ \t]*?
+                    (?:
+                    .*? # anything
+                    (?: # followed by another slt
+                        (?:<({slt_html})>)(?:.*?)(?:</(?:\4)>) # <span>stuff</span> >>>> match 1
+                       |(?:<({slt_html})\b[^>]+?>)(?:.*?)(?:</(?:\5)>) # <span stuff>stuff</span> >>> match 2
+                       |(?:<(?:{always_self_closing_html})\b[^>]*?/?>) # <img stuff />
+                       |(?:<(?:{slt_html})\b[^>]*?/>) # <img />
+                       |(?:{{%[ ]*?({slt_template})[ ]+?.*?%}})(?:.*?)(?:{{%[ ]+?end(?:\6)[ ]+?.*?%}}) # >>> match 3
+                       |{self.ignored_inline_blocks}
+                    )[ \t]*?
+                    )*? # optional of course
+                    [^<]*?$ # with no other tags following until end of line
+                """,
+            RE_FLAGS_IMX,
+        )
+        self.tag_unindent_IMX = re.compile(self.tag_unindent, RE_FLAGS_IMX)
+        self.h025_mismatching_X = re.compile(
+            r"<(/?(\w+))\s*(" + self.attribute_pattern + r"|\s*)*\s*?>", re.X
+        )
+        self.h025_selfclosing_IX = re.compile(
+            rf"^/?{self.always_self_closing_html_tags}\b", RE_FLAGS_IX
+        )
+        self.indent_tag_indent_IMX = re.compile(
+            r"^(?:" + str(self.tag_indent) + r")", RE_FLAGS_IMX
+        )
+        self.indent_find_unindent_IMX = re.compile(
+            r"^" + str(self.tag_unindent_line), RE_FLAGS_IMX
+        )
+        self.indent_opening_set_tag_IMX = re.compile(
+            r"^([ ]*{%[ ]*?set)(?!.*%}).*$", RE_FLAGS_IMX
+        )
+        self.indent_unindent_left_1_IMX = re.compile(
+            rf"(<({slt_html})>)(.*?)(</(\2)>[^<]*?$)", RE_FLAGS_IMX
+        )
+        self.indent_unindent_left_2_IMX = re.compile(
+            rf"(<({slt_html})\\b[^>]+?>)(.*?)(</(\2)>[^<]*?$)", RE_FLAGS_IMX
+        )
+        self.indent_closing_set_tag_IMX = re.compile(
+            r"^(?!.*\{\%).*%\}.*$", RE_FLAGS_IMX
+        )
+        self.indent_closing_curly_IMX = re.compile(
+            r"^[ ]*}|^[ ]*]", RE_FLAGS_IMX
+        )
+        self.indent_inline_block_1_IMX = re.compile(
+            rf"(^<({slt_html})>)(.*?)(</(\2)>)", RE_FLAGS_IMX
+        )
+        self.indent_inline_block_2_IMX = re.compile(
+            rf"(^<({slt_html})\b[^>]+?>)(.*?)(</(\2)>)", RE_FLAGS_IMX
         )

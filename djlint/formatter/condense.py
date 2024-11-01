@@ -45,7 +45,7 @@ def clean_whitespace(html: str, config: Config) -> str:
         if inside_protected_trans_block(config, html[: match.end()], match):
             return match.group().rstrip()
 
-        lines = sum(1 for _ in re.finditer(r"\n", match.group(2)))
+        lines = sum(1 for _ in config.newline_pattern.finditer(match.group(2)))
         blank_lines = "\n" * lines
         if lines > config.max_blank_lines:
             blank_lines = "\n" * max(config.max_blank_lines, 0)

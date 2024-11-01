@@ -6,10 +6,7 @@ import copy
 from itertools import chain
 from typing import TYPE_CHECKING
 
-import regex as re
-
 from ..helpers import (
-    RE_FLAGS_IX,
     inside_ignored_linter_block,
     inside_ignored_rule,
     overlaps_ignored_block,
@@ -17,6 +14,7 @@ from ..helpers import (
 from ..lint import get_line
 
 if TYPE_CHECKING:
+    import regex as re
     from typing_extensions import Any
 
     from ..lint import LintError
@@ -36,15 +34,9 @@ def run(
     open_tags: list[re.Match[str]] = []
     orphan_tags: list[re.Match[str]] = []
 
-    for match in re.finditer(
-        r"<(/?(\w+))\s*(" + config.attribute_pattern + r"|\s*)*\s*?>",
-        html,
-        flags=re.X,
-    ):
-        if match.group(1) and not re.search(
-            rf"^/?{config.always_self_closing_html_tags}\b",
-            match.group(1),
-            flags=RE_FLAGS_IX,
+    for match in config.h025_mismatching_X.finditer(html):
+        if match.group(1) and not config.h025_selfclosing_IX.search(
+            match.group(1)
         ):
             # close tags should equal open tags
             if match.group(1)[0] != "/":

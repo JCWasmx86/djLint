@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Sequence
+from functools import cache
 from typing import TYPE_CHECKING
 
 import regex as re
@@ -63,6 +64,11 @@ def get_line(start: int, line_ends: Sequence[Mapping[str, int]]) -> str:
     return "{}:{}".format(line_ends.index(line) + 1, start - line["start"])
 
 
+@cache
+def get_compiled_rule_pattern(regex: str, pattern: str) -> re.Pattern[str]:
+    return re.compile(regex, build_flags(pattern))
+
+
 def linter(
     config: Config, html: str, filename: str, filepath: str
 ) -> dict[str, list[LintError]]:
@@ -109,9 +115,10 @@ def linter(
         # rule based on patterns
         else:
             for pattern in rule["patterns"]:
-                for match in re.finditer(
-                    pattern, html, flags=build_flags(rule.get("flags", "re.S"))
-                ):
+                compiled = get_compiled_rule_pattern(
+                    pattern, rule.get("flags", "re.S")
+                )
+                for match in compiled.finditer(html):
                     if (
                         not overlaps_ignored_block(config, html, match)
                         and not inside_ignored_rule(

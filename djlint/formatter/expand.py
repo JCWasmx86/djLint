@@ -11,13 +11,7 @@ from typing import TYPE_CHECKING
 
 import regex as re
 
-from ..helpers import (
-    RE_FLAGS_IMX,
-    RE_FLAGS_IX,
-    RE_FLAGS_MX,
-    inside_ignored_block,
-    inside_template_block,
-)
+from ..helpers import RE_FLAGS_MX, inside_ignored_block, inside_template_block
 
 if TYPE_CHECKING:
     from ..settings import Config
@@ -44,28 +38,14 @@ def expand_html(html: str, config: Config) -> str:
 
         return out_format % match.group(1)
 
-    html_tags = config.break_html_tags
-
     add_left = partial(add_html_line, "\n%s")
     add_right = partial(add_html_line, "%s\n")
 
-    break_char = config.break_before
-
     # html tags - break before
-    html = re.sub(
-        rf"{break_char}\K(</?(?:{html_tags})\b(\"[^\"]*\"|'[^']*'|{{[^}}]*}}|[^'\">{{}}])*>)",
-        add_left,
-        html,
-        flags=RE_FLAGS_IX,
-    )
+    html = config.expand_break_before_IX.sub(add_left, html)
 
     # html tags - break after
-    html = re.sub(
-        rf"(</?(?:{html_tags})\b(\"[^\"]*\"|'[^']*'|{{[^}}]*}}|[^'\">{{}}])*>)(?!\s*?\n)(?=[^\n])",
-        add_right,
-        html,
-        flags=RE_FLAGS_IX,
-    )
+    html = config.expand_break_after_IX.sub(add_right, html)
 
     # template tag breaks
     def should_i_move_template_tag(
@@ -94,22 +74,11 @@ def expand_html(html: str, config: Config) -> str:
 
     # template tags
     # break before
-    html = re.sub(
-        break_char
-        + r"\K((?:{%|{{\#)[ ]*?(?:"
-        + config.break_template_tags
-        + ")[^}]+?[%}]})",
-        partial(should_i_move_template_tag, "\n%s"),
-        html,
-        flags=RE_FLAGS_IMX,
+    html = config.expand_template_tags_before_IMX.sub(
+        partial(should_i_move_template_tag, "\n%s"), html
     )
 
     # break after
-    return re.sub(
-        r"((?:{%|{{\#)[ ]*?(?:"
-        + config.break_template_tags
-        + ")[^}]+?[%}]})(?=[^\n])",
-        partial(should_i_move_template_tag, "%s\n"),
-        html,
-        flags=RE_FLAGS_IMX,
+    return config.expand_template_tags_after_IMX.sub(
+        partial(should_i_move_template_tag, "%s\n"), html
     )

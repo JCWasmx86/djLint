@@ -11,7 +11,6 @@ import regex as re
 from ..helpers import (
     RE_FLAGS_IMSX,
     RE_FLAGS_IMX,
-    RE_FLAGS_IX,
     inside_ignored_block,
     is_ignored_block_closing,
     is_ignored_block_opening,
@@ -79,14 +78,6 @@ def indent_html(rawcode: str, config: Config) -> str:
     is_block_raw = False
     jinja_replace_list = []
 
-    slt_html = config.indent_html_tags
-
-    # here using all tags cause we allow empty tags on one line
-    always_self_closing_html = config.always_self_closing_html_tags
-
-    # here using all tags cause we allow empty tags on one line
-    slt_template = config.optional_single_line_template_tags
-
     # nested ignored blocks..
     ignored_level = 0
 
@@ -112,43 +103,8 @@ def indent_html(rawcode: str, config: Config) -> str:
             if is_block_raw and ignored_level == 0:
                 is_block_raw = False
 
-        if (
-            not is_block_raw
-            and re.search(
-                rf"^\s*?(?:{config.ignored_inline_blocks})",
-                item,
-                flags=RE_FLAGS_IMX,
-            )
-        ) or (
-            not is_block_raw
-            and (
-                re.search(
-                    rf"""^(?:[^<\s].*?)? # start of a line, optionally with some text
-                    (?:
-                        (?:<({slt_html})>)(?:.*?)(?:</(?:\1)>) # <span>stuff</span> >>>> match 1
-                       |(?:<({slt_html})\b[^>]+?>)(?:.*?)(?:</(?:\2)>) # <span stuff>stuff</span> >>> match 2
-                       |(?:<(?:{always_self_closing_html})\b[^>]*?/?>) # <img stuff />
-                       |(?:<(?:{slt_html})\b[^>]*?/>) # <img />
-                       |(?:{{%[ ]*?({slt_template})[ ]+?.*?%}})(?:.*?)(?:{{%[ ]+?end(?:\3)[ ]+?.*?%}}) # >>> match 3
-                       |{config.ignored_inline_blocks}
-                    )[ \t]*?
-                    (?:
-                    .*? # anything
-                    (?: # followed by another slt
-                        (?:<({slt_html})>)(?:.*?)(?:</(?:\4)>) # <span>stuff</span> >>>> match 1
-                       |(?:<({slt_html})\b[^>]+?>)(?:.*?)(?:</(?:\5)>) # <span stuff>stuff</span> >>> match 2
-                       |(?:<(?:{always_self_closing_html})\b[^>]*?/?>) # <img stuff />
-                       |(?:<(?:{slt_html})\b[^>]*?/>) # <img />
-                       |(?:{{%[ ]*?({slt_template})[ ]+?.*?%}})(?:.*?)(?:{{%[ ]+?end(?:\6)[ ]+?.*?%}}) # >>> match 3
-                       |{config.ignored_inline_blocks}
-                    )[ \t]*?
-                    )*? # optional of course
-                    [^<]*?$ # with no other tags following until end of line
-                """,
-                    item,
-                    flags=RE_FLAGS_IMX,
-                )
-            )
+        if (not is_block_raw and config.indent_block_raw_IMX.search(item)) or (
+            not is_block_raw and (config.indent_full_match_IMX.search(item))
         ):
             tmp = (indent * indent_level) + item + "\n"
 
@@ -157,7 +113,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             not config.no_set_formatting
             and not is_block_raw
             and in_set_tag
-            and re.search(r"^(?!.*\{\%).*%\}.*$", item, flags=RE_FLAGS_IMX)
+            and config.indent_closing_set_tag_IMX.search(item)
         ):
             indent_level = max(indent_level - 1, 0)
             in_set_tag = False
@@ -168,7 +124,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             not config.no_set_formatting
             and not is_block_raw
             and in_set_tag
-            and re.search(r"^[ ]*}|^[ ]*]", item, flags=RE_FLAGS_IMX)
+            and config.indent_closing_curly_IMX.search(item)
         ):
             indent_level = max(indent_level - 1, 0)
             tmp = (indent * indent_level) + item + "\n"
@@ -177,27 +133,15 @@ def indent_html(rawcode: str, config: Config) -> str:
         elif (
             not is_block_raw
             and not is_safe_closing_tag_
-            and re.search(config.tag_unindent, item, flags=RE_FLAGS_IMX)
+            and config.tag_unindent_IMX.search(item)
             # and not ending in a slt like <span><strong></strong>.
-            and not re.search(
-                rf"(<({slt_html})>)(.*?)(</(\2)>[^<]*?$)",
-                item,
-                flags=RE_FLAGS_IMX,
-            )
-            and not re.search(
-                rf"(<({slt_html})\\b[^>]+?>)(.*?)(</(\2)>[^<]*?$)",
-                item,
-                flags=RE_FLAGS_IMX,
-            )
+            and not config.indent_unindent_left_1_IMX.search(item)
+            and not config.indent_unindent_left_2_IMX.search(item)
         ):
             # block to catch inline block followed by a non-break tag
-            if re.search(
-                rf"(^<({slt_html})>)(.*?)(</(\2)>)", item, flags=RE_FLAGS_IMX
-            ) or re.search(
-                rf"(^<({slt_html})\b[^>]+?>)(.*?)(</(\2)>)",
-                item,
-                flags=RE_FLAGS_IMX,
-            ):
+            if config.indent_inline_block_1_IMX.search(
+                item
+            ) or config.indent_inline_block_2_IMX.search(item):
                 # unindent after instead of before
                 tmp = (indent * indent_level) + item + "\n"
                 indent_level = max(indent_level - 1, 0)
@@ -205,9 +149,7 @@ def indent_html(rawcode: str, config: Config) -> str:
                 indent_level = max(indent_level - 1, 0)
                 tmp = (indent * indent_level) + item + "\n"
 
-        elif not is_block_raw and re.search(
-            r"^" + str(config.tag_unindent_line), item, flags=RE_FLAGS_IMX
-        ):
+        elif not is_block_raw and config.indent_find_unindent_IMX.search(item):
             tmp = (indent * (indent_level - 1)) + item + "\n"
 
         # if indent, move right
@@ -217,9 +159,7 @@ def indent_html(rawcode: str, config: Config) -> str:
             not config.no_set_formatting
             and not is_block_raw
             and not in_set_tag
-            and re.search(
-                r"^([ ]*{%[ ]*?set)(?!.*%}).*$", item, flags=RE_FLAGS_IMX
-            )
+            and config.indent_opening_set_tag_IMX.search(item)
         ):
             tmp = (indent * indent_level) + item + "\n"
             indent_level += 1
@@ -235,14 +175,7 @@ def indent_html(rawcode: str, config: Config) -> str:
                 item,
                 flags=RE_FLAGS_IMX,
             )
-        ) or (
-            re.search(
-                r"^(?:" + str(config.tag_indent) + r")",
-                item,
-                flags=RE_FLAGS_IMX,
-            )
-            and not is_block_raw
-        ):
+        ) or (config.indent_tag_indent_IMX.search(item) and not is_block_raw):
             tmp = (indent * indent_level) + item + "\n"
             indent_level += 1
 
@@ -272,12 +205,7 @@ def indent_html(rawcode: str, config: Config) -> str:
 
             func = partial(format_attributes, config, item)
 
-            tmp = re.sub(
-                rf"(\s*?)(<(?:{config.indent_html_tags}))\s((?:\"[^\"]*\"|'[^']*'|{{[^}}]*}}|[^'\">{{}}\/])+?)(\s?/?>)",
-                func,
-                tmp,
-                flags=RE_FLAGS_IX,
-            )
+            tmp = config.indent_leading_space_IX.sub(func, tmp)
 
         # turn off raw block if we hit end - for one line raw blocks, but not an inline raw
         if (
